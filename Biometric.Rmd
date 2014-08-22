@@ -1,0 +1,80 @@
+---
+title: "Predicting Exercise Form using Biometric Data"
+author: "Ken Linsenmayer"
+date: "August 21, 2014"
+output: html_document
+---
+
+###Executive Summary
+Can we predict how well someone performed an exercise using sensor data?  Using biometric data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants, we trained a model to predict how well an individual performed an barbell lift exercise.  By fitting a random forest model on training data we achieved a prediction accuracy of over 99% on our testing data.
+
+###Building our Feature list
+Feature selection is important in all prediction models, especially with this data set.  Exploratory data analysis shows that the data provided on the course project webpage consists of 160 different features; however, many of these are very sparsely populated and contain very large numbers of missing values.  We do not want to use incomplete features for our model, so we will select only those features where we have recorded data for all 19,622 observations in the database.
+```{r warning=FALSE, message=FALSE}
+library(caret)
+df <- read.csv("~/Dropbox/R/Machine Learning Class/pml-training.csv")
+
+# Create functions to convert factor variables to numeric, and apply to our data
+asNumeric <- function(x) as.numeric(as.character(x))
+factorsNumeric <- function(d) modifyList(d, lapply(d[, sapply(d, is.factor)], asNumeric))
+df <- factorsNumeric(df)
+#use the describe function to get summary stats, and select only those features where we have the full number (n=19622) of observations
+library("psych")
+stats <- describe(df)
+featureSet <- row.names(stats[stats$n == 19622,])[-(1:4)]  ## also ignore the first 4 bookkeeping features
+length(featureSet)
+```
+We now have a set of the 52 features for which we have data for all of the records.  
+
+### Getting the data
+Next we will load in the data, take just the features we previously identified (along with the outcome), and split it into testing and training sets using a 70/30 split.
+```{r}
+## load in the data and select the features we are interested in
+df <- read.csv("~/Dropbox/R/Machine Learning Class/pml-training.csv")
+df <- df[,c("classe",featureSet)]
+
+## set the random number seed
+set.seed(1234)
+
+## split the data into testing and training sets with a 70/30 split
+inTrain <- createDataPartition(y=df$classe, p=0.7, list=FALSE)
+training <- df[inTrain,]
+testing <- df[-inTrain,]
+dim(training); dim(testing)
+```
+
+###Model Fitting
+Random forest models tend to do well across a wide spectrum of problems, achieving high accuracy.  We will train a random forest model with default parameters to fit the data.  Random forests can take a long time to train, especially for models with many features.  We will utilize parallel processing with multiple cores by using the doMC library.
+```{r cache=TRUE, results='hide', message=FALSE}
+library("doMC")
+registerDoMC(cores = 3) ## set to number of cores to be used
+modFit <- train(classe ~ ., data=training, method="rf")
+```
+
+###Analysis
+We will now evaluate our model on the testing set, which was set aside earlier and was not used to train the model.  Cross-validation on our testing data should give us a good idea how well we can expect our model to perform on new "unseen" data.
+```{r}
+confusionMatrix(predict(modFit, testing), testing$classe)
+```
+These results are impressive, with an overall accuracy over 99.5%.  Based on these results, we can now use this model to predict the "classe" variable for each of the 20 test cases for the second part of the assignment.
+```{r}
+## load in the data and select the features we are interested in
+df <- read.csv("~/Dropbox/R/Machine Learning Class/pml-testing.csv")
+df <- df[,featureSet]
+
+## calculate predicted values
+answers <- predict(modFit, df)
+
+## use the suggested function from class to generate files
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answers)
+```
+
+###Conclusion
+The random forest model was able to learn to accurately predict exercise form using biometric data.  Based on cross-validation testing, we expect our model to achieve  greater than 99% accuracy overall.  Our model utilized 52 features to predict the exercise form.  
