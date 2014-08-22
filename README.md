@@ -2,6 +2,8 @@
 
 This repository contains the following files for the Coursera Machine Learning class as part of the John Hopkins University Data Science specialization:
 
+The report can be seen on my gh-pages branch at the following url:  
+http://kenlinsenmayer.github.io/Biometrics/Biometric.html
 
 * Biometrics.Rmd is the R markdown file used to generate the html report
 * Biometrics.html is the submitted report on the exercise form prediction problem
